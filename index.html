@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>6205 Rivercliffe – Site Plan Measuring Tool</title>
+<style>
+  :root{
+    --bg:#f6f6f4; --panel:#ffffff; --ink:#1d1d1b; --muted:#6b6b66; --line:#e3e2dd;
+    --accent:#1f5fbf; --accent-soft:#e7eefa;
+    --dist:#e8590c; --path:#7048e8; --area:#0b8f7a; --cal:#d6336c; --ref:#2f9e44;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .app{display:flex;flex-direction:column;height:100vh}
+  header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+  header h1{font-size:14px;margin:0 8px 0 0;font-weight:600;white-space:nowrap}
+  header h1 span{color:var(--muted);font-weight:400}
+  .group{display:flex;gap:2px;background:#efeee9;border-radius:8px;padding:2px}
+  button{font:inherit;border:0;background:transparent;color:var(--ink);padding:6px 10px;border-radius:6px;cursor:pointer;white-space:nowrap}
+  button:hover{background:#e4e3dd}
+  button.on{background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.12);color:var(--accent);font-weight:600}
+  button.solid{background:var(--accent);color:#fff}
+  button.solid:hover{background:#174d9c}
+  button.ghost{border:1px solid var(--line);background:var(--panel)}
+  button:disabled{opacity:.4;cursor:default}
+  kbd{font:11px ui-monospace,Menlo,monospace;color:var(--muted);margin-left:4px}
+  .sp{flex:1}
+  .zoom{color:var(--muted);font-variant-numeric:tabular-nums;min-width:48px;text-align:right}
+  main{flex:1;display:flex;min-height:0}
+  .stage{position:relative;flex:1;min-width:0;overflow:hidden;background:#d9d8d2;touch-action:none}
+  canvas#c{position:absolute;inset:0;width:100%;height:100%;display:block}
+  canvas#loupe{position:absolute;width:170px;height:170px;border-radius:50%;border:2px solid #fff;
+    box-shadow:0 2px 10px rgba(0,0,0,.35);pointer-events:none;display:none;background:#fff}
+  .hint{position:absolute;left:12px;bottom:12px;background:rgba(29,29,27,.82);color:#fff;padding:6px 10px;border-radius:6px;font-size:12.5px;pointer-events:none;max-width:70%}
+  .live{position:absolute;right:12px;top:12px;background:var(--panel);border:1px solid var(--line);padding:6px 10px;border-radius:6px;
+    font-variant-numeric:tabular-nums;font-weight:600;display:none;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+  aside{width:330px;flex:none;background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:14px}
+  aside h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 8px;font-weight:600}
+  aside h2:first-child{margin-top:0}
+  .card{border:1px solid var(--line);border-radius:8px;padding:10px}
+  .scale-main{font-size:15px;font-weight:600}
+  .scale-sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+  th{text-align:left;color:var(--muted);font-weight:500;padding:4px 4px;border-bottom:1px solid var(--line)}
+  td{padding:5px 4px;border-bottom:1px solid #f0efea}
+  td.n{text-align:right}
+  tr.click{cursor:pointer}
+  tr.click:hover td{background:#f7f7f4}
+  .ok{color:var(--ref)} .warn{color:#c92a2a}
+  label.chk{display:flex;gap:6px;align-items:center;margin-top:8px;font-size:13px;cursor:pointer}
+  .m{display:flex;gap:8px;align-items:flex-start;padding:8px 6px;border-bottom:1px solid #f0efea;cursor:pointer;border-radius:6px}
+  .m:hover{background:#f7f7f4}
+  .m.sel{background:var(--accent-soft)}
+  .sw{width:10px;height:10px;border-radius:3px;margin-top:5px;flex:none}
+  .m .body{flex:1;min-width:0}
+  .m input{font:inherit;border:0;background:transparent;width:100%;padding:0;color:var(--ink);font-weight:500}
+  .m input:focus{outline:1px solid var(--accent);border-radius:3px;background:#fff}
+  .m .val{font-variant-numeric:tabular-nums;font-size:13px}
+  .m .sub{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+  .m .x{color:var(--muted);padding:2px 6px}
+  .empty{color:var(--muted);font-size:13px;padding:6px 2px}
+  .help{color:var(--muted);font-size:12.5px;margin:0;padding-left:16px}
+  .help li{margin:3px 0}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:10}
+  .modal .box{background:#fff;border-radius:10px;padding:18px;width:min(360px,92vw);box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  .modal h3{margin:0 0 6px;font-size:16px}
+  .modal p{margin:0 0 12px;color:var(--muted);font-size:13px}
+  .modal input{font:inherit;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:16px}
+  .modal .err{color:#c92a2a;font-size:12.5px;min-height:18px;margin-top:4px}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1d1d1b;color:#fff;padding:8px 14px;border-radius:6px;display:none;z-index:20;font-size:13px}
+  textarea.fallback{width:100%;height:140px;font:12px ui-monospace,monospace;margin-top:8px;display:none}
+  input[type=file]{display:none}
+  @media (max-width:820px){
+    main{flex-direction:column}
+    aside{width:auto;max-height:42vh;border-left:0;border-top:1px solid var(--line)}
+    kbd{display:none}
+    header h1 span{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>6205 Rivercliffe Dr <span>· Site Plan (Sheet 2) · 1" = 20'</span></h1>
+    <div class="group" id="tools">
+      <button data-tool="pan">Pan<kbd>H</kbd></button>
+      <button data-tool="distance" class="on">Distance<kbd>D</kbd></button>
+      <button data-tool="path">Path<kbd>P</kbd></button>
+      <button data-tool="area">Area<kbd>A</kbd></button>
+      <button data-tool="calibrate">Calibrate<kbd>C</kbd></button>
+    </div>
+    <button class="ghost" id="finishBtn" disabled>Finish<kbd>↵</kbd></button>
+    <button class="ghost" id="undoBtn">Undo<kbd>⌫</kbd></button>
+    <div class="sp"></div>
+    <div class="group">
+      <button id="zoomOut" title="Zoom out">−</button>
+      <button id="fitBtn" title="Fit to screen">Fit<kbd>F</kbd></button>
+      <button id="zoomIn" title="Zoom in">+</button>
+    </div>
+    <span class="zoom" id="zoomLbl">100%</span>
+    <button class="ghost" id="loadBtn" title="Load a different plan image (PNG/JPG)">Load image…</button>
+    <input type="file" id="file" accept="image/*">
+  </header>
+  <main>
+    <div class="stage" id="stage">
+      <canvas id="c"></canvas>
+      <canvas id="loupe" width="170" height="170"></canvas>
+      <div class="live" id="live"></div>
+      <div class="hint" id="hint"></div>
+    </div>
+    <aside>
+      <h2>Scale</h2>
+      <div class="card">
+        <div class="scale-main" id="scaleMain"></div>
+        <div class="scale-sub" id="scaleSub"></div>
+        <div class="row">
+          <button class="ghost" id="calBtn">Calibrate from a dimension</button>
+          <button class="ghost" id="resetScale">Reset to sheet scale</button>
+        </div>
+      </div>
+
+      <div id="refSection">
+        <h2>Reference dimensions (check)</h2>
+        <table>
+          <thead><tr><th>Dimension on plan</th><th class="n">Plan</th><th class="n">Measured</th><th class="n">Δ</th></tr></thead>
+          <tbody id="refBody"></tbody>
+        </table>
+        <label class="chk"><input type="checkbox" id="showRefs"> Show reference lines on plan</label>
+      </div>
+
+      <h2>Measurements</h2>
+      <div id="list"></div>
+      <div class="row">
+        <button class="ghost" id="copyBtn">Copy all</button>
+        <button class="ghost" id="clearBtn">Clear all</button>
+      </div>
+      <textarea class="fallback" id="fallback" readonly></textarea>
+
+      <h2>How to use</h2>
+      <ul class="help">
+        <li><b>Distance</b>: click two points.</li>
+        <li><b>Path</b>: click points along a run (a fence, a wall); double-click or Enter to finish.</li>
+        <li><b>Area</b>: click the corners; click the first point, double-click or press Enter to close.</li>
+        <li>Hold <b>Shift</b> to snap the angle to the sheet axes or the building/pool grid (≈11.3°).</li>
+        <li>Points snap to existing measurement points. Drag any point to adjust it.</li>
+        <li>Drag to pan, scroll or pinch to zoom. Esc cancels, ⌫ removes the last point.</li>
+      </ul>
+    </aside>
+  </main>
+</div>
+
+<div class="modal" id="calModal">
+  <div class="box">
+    <h3>Set scale</h3>
+    <p id="calInfo">Enter the real length of the line you just drew (for example <b>34</b>, <b>17'</b>, <b>12' 6"</b> or <b>296.25</b>).</p>
+    <input id="calInput" placeholder="Length in feet" inputmode="decimal" autocomplete="off">
+    <div class="err" id="calErr"></div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="ghost" id="calCancel">Cancel</button>
+      <button class="solid" id="calOk">Set scale</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  // ---------- Constants ----------
+  // Image is Sheet 2 rendered at 200 dpi from a 36x24 sheet drawn at 1" = 20'  ->  200 px / 20 ft = 10 px per foot.
+  const SHEET_PPF = 10;
+  const GRID_ANGLE = Math.atan2(2140.7 - 2074.1, 2123.2 - 1789.6); // pool / building grid ≈ 11.29°
+  const REFS = [
+    { name: "Pool length", ft: 34,     a: [1789.6, 2074.1], b: [2123.2, 2140.7] },
+    { name: "Pool width",  ft: 17,     a: [2123.2, 2140.7], b: [2156.5, 1974.1] },
+    { name: "South property line", ft: 296.25, a: [412.9, 2260.2], b: [3371.2, 2419.9] },
+    { name: "North property line", ft: 294.04, a: [596.2, 785.7],  b: [3385.4, 1717.1] },
+  ];
+  const COLORS = { distance: "#e8590c", path: "#7048e8", area: "#0b8f7a", calibrate: "#d6336c", ref: "#2f9e44" };
+  const STORE_KEY = "rivercliffe-sitemeasure-v1";
+
+  // ---------- State ----------
+  const S = {
+    img: null, isPlan: true, ppf: SHEET_PPF, calNote: null,
+    tool: "distance", meas: [], draft: null, cursor: null, shift: false,
+    view: { s: 1, x: 0, y: 0 }, showRefs: false, sel: null, nextId: 1,
+  };
+
+  const $ = id => document.getElementById(id);
+  const stage = $("stage"), cv = $("c"), ctx = cv.getContext("2d");
+  const loupe = $("loupe"), lctx = loupe.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+
+  // ---------- Persistence (best effort) ----------
+  function save() {
+    if (!S.isPlan) return;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ meas: S.meas, ppf: S.ppf, calNote: S.calNote, showRefs: S.showRefs, nextId: S.nextId })); } catch (e) {}
+  }
+  function load() {
+    try {
+      const d = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+      if (d) { S.meas = d.meas || []; S.ppf = d.ppf || SHEET_PPF; S.calNote = d.calNote || null; S.showRefs = !!d.showRefs; S.nextId = d.nextId || (S.meas.length + 1); }
+    } catch (e) {}
+  }
+
+  // ---------- Geometry / formatting ----------
+  const dist = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const pathLen = pts => pts.reduce((s, p, i) => i ? s + dist(pts[i - 1], p) : 0, 0);
+  const polyArea = pts => { let s = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; s += p[0] * q[1] - q[0] * p[1]; } return Math.abs(s) / 2; };
+  const centroid = pts => {
+    let a = 0, cx = 0, cy = 0;
+    for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length], f = p[0] * q[1] - q[0] * p[1]; a += f; cx += (p[0] + q[0]) * f; cy += (p[1] + q[1]) * f; }
+    if (Math.abs(a) < 1e-6) return pts[0];
+    return [cx / (3 * a), cy / (3 * a)];
+  };
+  const toFt = px => px / S.ppf;
+  function fmtFtIn(ft) {
+    const neg = ft < 0; ft = Math.abs(ft);
+    let totalIn = Math.round(ft * 12);
+    const f = Math.floor(totalIn / 12), i = totalIn - f * 12;
+    return (neg ? "−" : "") + f + "′ " + i + "″";
+  }
+  const fmtDec = ft => ft.toFixed(2) + " ft";
+  const fmtArea = sf => Math.round(sf).toLocaleString() + " sq ft";
+
+  function measValue(m) {
+    if (m.type === "distance") { const ft = toFt(dist(m.pts[0], m.pts[1])); return { main: fmtFtIn(ft), sub: fmtDec(ft), ft }; }
+    if (m.type === "path") { const ft = toFt(pathLen(m.pts)); return { main: fmtFtIn(ft), sub: fmtDec(ft) + " · " + (m.pts.length - 1) + " segments", ft }; }
+    const sf = polyArea(m.pts) / (S.ppf * S.ppf), per = toFt(pathLen([...m.pts, m.pts[0]]));
+    return { main: fmtArea(sf), sub: "Perimeter " + fmtFtIn(per) + " (" + fmtDec(per) + ")", sf, per };
+  }
+
+  function parseLength(s) {
+    s = (s || "").trim().toLowerCase().replace(/feet|foot/g, "ft").replace(/inches|inch/g, "in").replace(/[′’]/g, "'").replace(/[″”]/g, '"');
+    if (!s) return null;
+    let m = s.match(/^(\d+(?:\.\d+)?)\s*(?:'|ft)?\s*(?:-|\s)?\s*(?:(\d+(?:\.\d+)?)\s*(?:"|in))?$/);
+    if (m) { const ft = parseFloat(m[1]) + (m[2] ? parseFloat(m[2]) / 12 : 0); return ft > 0 ? ft : null; }
+    m = s.match(/^(\d+(?:\.\d+)?)\s*(?:"|in)$/);
+    if (m) { const ft = parseFloat(m[1]) / 12; return ft > 0 ? ft : null; }
+    m = s.match(/^(\d+(?:\.\d+)?)\s*m$/);
+    if (m) return parseFloat(m[1]) * 3.28084;
+    return null;
+  }
+
+  // ---------- View transforms ----------
+  const toScreen = p => [p[0] * S.view.s + S.view.x, p[1] * S.view.s + S.view.y];
+  const toImg = (sx, sy) => [(sx - S.view.x) / S.view.s, (sy - S.view.y) / S.view.s];
+
+  function resize() {
+    DPR = window.devicePixelRatio || 1;
+    const r = stage.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    draw();
+  }
+  function fit() {
+    if (!S.img) return;
+    const pad = 20, s = Math.min((W - pad * 2) / S.img.width, (H - pad * 2) / S.img.height);
+    S.view.s = s; S.view.x = (W - S.img.width * s) / 2; S.view.y = (H - S.img.height * s) / 2;
+    draw();
+  }
+  function zoomAt(f, sx, sy) {
+    const ns = Math.min(Math.max(S.view.s * f, 0.03), 12);
+    f = ns / S.view.s;
+    S.view.x = sx - (sx - S.view.x) * f; S.view.y = sy - (sy - S.view.y) * f; S.view.s = ns;
+    draw();
+  }
+  function zoomTo(pts) {
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const bw = Math.max(x1 - x0, 60), bh = Math.max(y1 - y0, 60);
+    const s = Math.min(Math.min((W * 0.7) / bw, (H * 0.7) / bh), 4);
+    S.view.s = s; S.view.x = W / 2 - ((x0 + x1) / 2) * s; S.view.y = H / 2 - ((y0 + y1) / 2) * s;
+    draw();
+  }
+
+  // ---------- Snapping ----------
+  function allVertices(exclude) {
+    const out = [];
+    for (const m of S.meas) m.pts.forEach((p, i) => { if (!(exclude && exclude.m === m && exclude.i === i)) out.push(p); });
+    if (S.draft) S.draft.pts.forEach(p => out.push(p));
+    return out;
+  }
+  function snap(p, opts = {}) {
+    const r = 9 / S.view.s;
+    let best = null, bd = r;
+    for (const v of allVertices(opts.exclude)) { const d = dist(v, p); if (d < bd) { bd = d; best = v; } }
+    if (best) return { p: [best[0], best[1]], snapped: "point" };
+    const anchor = opts.anchor;
+    if (S.shift && anchor) {
+      const dx = p[0] - anchor[0], dy = p[1] - anchor[1], len = Math.hypot(dx, dy);
+      if (len > 0) {
+        const ang = Math.atan2(dy, dx), cands = [];
+        for (let k = 0; k < 8; k++) cands.push(k * Math.PI / 4);
+        for (let k = 0; k < 4; k++) cands.push(GRID_ANGLE + k * Math.PI / 2);
+        let ba = cands[0], bdiff = 9;
+        for (const c of cands) { let d = Math.abs(Math.atan2(Math.sin(ang - c), Math.cos(ang - c))); if (d < bdiff) { bdiff = d; ba = c; } }
+        const proj = dx * Math.cos(ba) + dy * Math.sin(ba);
+        return { p: [anchor[0] + proj * Math.cos(ba), anchor[1] + proj * Math.sin(ba)], snapped: "angle" };
+      }
+    }
+    return { p, snapped: null };
+  }
+  function hitVertex(sx, sy) {
+    for (let j = S.meas.length - 1; j >= 0; j--) {
+      const m = S.meas[j];
+      for (let i = 0; i < m.pts.length; i++) { const q = toScreen(m.pts[i]); if (Math.hypot(q[0] - sx, q[1] - sy) < 9) return { m, i }; }
+    }
+    return null;
+  }
+
+  // ---------- Drawing ----------
+  function render(c, view, w, h, dpr, opts = {}) {
+    const ts = p => [p[0] * view.s + view.x, p[1] * view.s + view.y];
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.fillStyle = "#d9d8d2"; c.fillRect(0, 0, w, h);
+    if (!S.img) return;
+    c.save();
+    c.setTransform(dpr * view.s, 0, 0, dpr * view.s, dpr * view.x, dpr * view.y);
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = view.s < 1 ? "high" : "low";
+    c.drawImage(S.img, 0, 0);
+    c.restore();
+
+    const line = (pts, color, width, dash, closed) => {
+      if (pts.length < 2) return;
+      c.beginPath(); pts.map(ts).forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]));
+      if (closed) c.closePath();
+      c.setLineDash(dash || []); c.lineWidth = width + 2.5; c.strokeStyle = "rgba(255,255,255,.85)"; c.stroke();
+      c.lineWidth = width; c.strokeStyle = color; c.stroke(); c.setLineDash([]);
+    };
+    const dots = (pts, color, r = 3.5) => pts.map(ts).forEach(q => {
+      c.beginPath(); c.arc(q[0], q[1], r, 0, 7); c.fillStyle = "#fff"; c.fill(); c.lineWidth = 2; c.strokeStyle = color; c.stroke();
+    });
+    const label = (p, text, color, small) => {
+      const q = ts(p);
+      c.font = (small ? "600 11px " : "600 12.5px ") + "-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif";
+      const tw = c.measureText(text).width, ph = small ? 18 : 21;
+      c.fillStyle = color; roundRect(c, q[0] - tw / 2 - 6, q[1] - ph / 2, tw + 12, ph, 5); c.fill();
+      c.fillStyle = "#fff"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(text, q[0], q[1] + 0.5);
+    };
+
+    if (S.showRefs && S.isPlan && !opts.noLabels) {
+      for (const r of REFS) {
+        line([r.a, r.b], COLORS.ref, 2, [8, 5]);
+        dots([r.a, r.b], COLORS.ref, 3);
+        label([(r.a[0] + r.b[0]) / 2, (r.a[1] + r.b[1]) / 2], r.name + " " + fmtFtIn(toFt(dist(r.a, r.b))), COLORS.ref, true);
+      }
+    }
+
+    for (const m of S.meas) {
+      const col = COLORS[m.type], sel = S.sel === m.id, w = sel ? 3 : 2;
+      if (m.type === "area") {
+        c.beginPath(); m.pts.map(ts).forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.closePath();
+        c.fillStyle = sel ? "rgba(11,143,122,.28)" : "rgba(11,143,122,.16)"; c.fill();
+        line(m.pts, col, w, null, true);
+      } else line(m.pts, col, w);
+      dots(m.pts, col);
+      if (!opts.noLabels) {
+        const v = measValue(m);
+        let at;
+        if (m.type === "distance") at = [(m.pts[0][0] + m.pts[1][0]) / 2, (m.pts[0][1] + m.pts[1][1]) / 2];
+        else if (m.type === "path") { const i = Math.floor((m.pts.length - 1) / 2); at = [(m.pts[i][0] + m.pts[i + 1][0]) / 2, (m.pts[i][1] + m.pts[i + 1][1]) / 2]; }
+        else at = centroid(m.pts);
+        label(at, (m.label ? m.label + ": " : "") + v.main, col);
+      }
+    }
+
+    if (S.draft) {
+      const d = S.draft, col = COLORS[d.type];
+      const pts = S.cursor ? [...d.pts, S.cursor] : d.pts;
+      if (d.type === "area" && pts.length >= 3) {
+        c.beginPath(); pts.map(ts).forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.closePath();
+        c.fillStyle = "rgba(11,143,122,.12)"; c.fill();
+        line(pts, col, 2, [6, 4], true);
+      } else line(pts, col, 2, [6, 4]);
+      dots(d.pts, col);
+      if (S.cursor && d.pts.length && !opts.noLabels) {
+        const a = d.pts[d.pts.length - 1];
+        label([(a[0] + S.cursor[0]) / 2, (a[1] + S.cursor[1]) / 2], fmtFtIn(toFt(dist(a, S.cursor))), col, true);
+      }
+    }
+    if (S.cursor && opts.crosshair) {
+      const q = ts(S.cursor);
+      c.strokeStyle = "rgba(214,51,108,.9)"; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(q[0] - 14, q[1]); c.lineTo(q[0] - 3, q[1]); c.moveTo(q[0] + 3, q[1]); c.lineTo(q[0] + 14, q[1]);
+      c.moveTo(q[0], q[1] - 14); c.lineTo(q[0], q[1] - 3); c.moveTo(q[0], q[1] + 3); c.lineTo(q[0], q[1] + 14); c.stroke();
+    }
+  }
+  function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+
+  let raf = 0;
+  function draw() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; drawNow(); }); }
+  function drawNow() {
+    render(ctx, S.view, W, H, DPR);
+    $("zoomLbl").textContent = Math.round(S.view.s * 100) + "%";
+    drawLoupe(); updateLive(); updateHint();
+  }
+
+  let loupeOn = false, lastScreen = null;
+  function drawLoupe() {
+    const measuring = S.tool !== "pan";
+    if (!loupeOn || !measuring || !S.cursor || !lastScreen) { loupe.style.display = "none"; return; }
+    const size = 170, mag = Math.max(S.view.s * 4, 1.5);
+    const v = { s: mag, x: size / 2 - S.cursor[0] * mag, y: size / 2 - S.cursor[1] * mag };
+    const ldpr = window.devicePixelRatio || 1;
+    if (loupe.width !== size * ldpr) { loupe.width = size * ldpr; loupe.height = size * ldpr; }
+    render(lctx, v, size, size, ldpr, { noLabels: true, crosshair: true });
+    let lx = lastScreen[0] + 24, ly = lastScreen[1] - size - 24;
+    if (ly < 8) ly = lastScreen[1] + 24;
+    if (lx + size > W - 8) lx = lastScreen[0] - size - 24;
+    loupe.style.left = lx + "px"; loupe.style.top = ly + "px"; loupe.style.display = "block";
+  }
+
+  function updateLive() {
+    const el = $("live");
+    if (S.draft && S.cursor && S.draft.pts.length) {
+      const pts = [...S.draft.pts, S.cursor];
+      let t;
+      if (S.draft.type === "area" && pts.length >= 3) t = fmtArea(polyArea(pts) / (S.ppf * S.ppf)) + " · perim " + fmtFtIn(toFt(pathLen([...pts, pts[0]])));
+      else t = fmtFtIn(toFt(pathLen(pts))) + "  (" + fmtDec(toFt(pathLen(pts))) + ")";
+      el.textContent = t; el.style.display = "block";
+    } else el.style.display = "none";
+  }
+  function updateHint() {
+    const d = S.draft, n = d ? d.pts.length : 0, t = S.tool;
+    let h = "";
+    if (!S.img) h = "Loading plan…";
+    else if (t === "pan") h = "Drag to pan · scroll or pinch to zoom · drag any point to adjust it";
+    else if (t === "distance") h = n ? "Click the second point (Shift = snap angle)" : "Click the first point of the distance";
+    else if (t === "calibrate") h = n ? "Click the other end of the known dimension" : "Calibrate: click one end of a dimension whose length you know";
+    else if (t === "path") h = n < 2 ? "Click points along the run" : "Keep clicking · double-click or Enter to finish";
+    else if (t === "area") h = n < 3 ? "Click the corners of the area" : "Click the first point, double-click or press Enter to close";
+    if (!S.isPlan && !S.calNote && S.img) h = "New image: use Calibrate on a known dimension first · " + h;
+    $("hint").textContent = h;
+    $("finishBtn").disabled = !(d && ((d.type === "path" && n >= 2) || (d.type === "area" && n >= 3)));
+  }
+
+  // ---------- Sidebar ----------
+  function renderSide() {
+    if (S.isPlan && !S.calNote) {
+      $("scaleMain").textContent = "1\" = 20′  ·  " + S.ppf.toFixed(2) + " px/ft";
+      $("scaleSub").textContent = "Sheet scale, checked against the pool (34′ × 17′) and both property lines (296.25′, 294.04′): all within 0.1%.";
+    } else if (S.calNote) {
+      $("scaleMain").textContent = "Custom · " + S.ppf.toFixed(3) + " px/ft";
+      $("scaleSub").textContent = "Calibrated from a line you set to " + S.calNote + ".";
+    } else {
+      $("scaleMain").textContent = "Not calibrated";
+      $("scaleSub").textContent = "Use Calibrate and click both ends of a dimension printed on the plan.";
+    }
+    $("resetScale").style.display = S.isPlan ? "" : "none";
+    $("refSection").style.display = S.isPlan ? "" : "none";
+    $("showRefs").checked = S.showRefs;
+
+    const rb = $("refBody"); rb.innerHTML = "";
+    for (const r of REFS) {
+      const m = toFt(dist(r.a, r.b)), e = (m - r.ft) / r.ft * 100;
+      const tr = document.createElement("tr"); tr.className = "click";
+      tr.innerHTML = `<td>${r.name}</td><td class="n">${fmtFtIn(r.ft)}</td><td class="n">${fmtFtIn(m)}</td><td class="n ${Math.abs(e) < 0.5 ? "ok" : "warn"}">${(e >= 0 ? "+" : "") + e.toFixed(2)}%</td>`;
+      tr.onclick = () => { S.showRefs = true; renderSide(); zoomTo([r.a, r.b]); save(); };
+      rb.appendChild(tr);
+    }
+
+    const list = $("list"); list.innerHTML = "";
+    if (!S.meas.length) { list.innerHTML = '<div class="empty">No measurements yet. Pick Distance, Path or Area and click on the plan.</div>'; return; }
+    S.meas.forEach((m, idx) => {
+      const v = measValue(m);
+      const div = document.createElement("div"); div.className = "m" + (S.sel === m.id ? " sel" : "");
+      div.innerHTML = `<div class="sw" style="background:${COLORS[m.type]}"></div>
+        <div class="body"><input value="" placeholder="${m.type[0].toUpperCase() + m.type.slice(1)} ${idx + 1}">
+        <div class="val"><b>${v.main}</b></div><div class="sub">${v.sub}</div></div>
+        <button class="x" title="Delete">✕</button>`;
+      const inp = div.querySelector("input"); inp.value = m.label || "";
+      inp.onclick = e => e.stopPropagation();
+      inp.oninput = () => { m.label = inp.value; draw(); save(); };
+      inp.onkeydown = e => { if (e.key === "Enter") inp.blur(); e.stopPropagation(); };
+      div.querySelector(".x").onclick = e => { e.stopPropagation(); S.meas = S.meas.filter(x => x !== m); if (S.sel === m.id) S.sel = null; commitChange(); };
+      div.onclick = () => { S.sel = m.id; renderSide(); zoomTo(m.pts); };
+      list.appendChild(div);
+    });
+  }
+  function commitChange() { renderSide(); draw(); save(); }
+
+  // ---------- Tools ----------
+  function setTool(t) {
+    S.tool = t; S.draft = null;
+    document.querySelectorAll("#tools button").forEach(b => b.classList.toggle("on", b.dataset.tool === t));
+    stage.style.cursor = t === "pan" ? "grab" : "crosshair";
+    draw();
+  }
+  function finishDraft() {
+    const d = S.draft; if (!d) return;
+    if (d.type === "path" && d.pts.length >= 2) S.meas.push({ id: S.nextId++, type: "path", pts: d.pts, label: "" });
+    else if (d.type === "area" && d.pts.length >= 3) S.meas.push({ id: S.nextId++, type: "area", pts: d.pts, label: "" });
+    else return;
+    S.sel = S.meas[S.meas.length - 1].id;
+    S.draft = null; commitChange();
+  }
+  function addPoint(p) {
+    const t = S.tool; if (t === "pan") return;
+    if (!S.draft) S.draft = { type: t, pts: [] };
+    const d = S.draft;
+    if (d.type === "area" && d.pts.length >= 3 && dist(p, d.pts[0]) < 9 / S.view.s) { finishDraft(); return; }
+    if (d.pts.length && dist(p, d.pts[d.pts.length - 1]) < 0.5 / S.view.s) return;
+    d.pts.push(p);
+    if (d.type === "distance" && d.pts.length === 2) {
+      S.meas.push({ id: S.nextId++, type: "distance", pts: d.pts, label: "" });
+      S.sel = S.meas[S.meas.length - 1].id; S.draft = null; commitChange(); return;
+    }
+    if (d.type === "calibrate" && d.pts.length === 2) { openCal(d.pts); return; }
+    draw();
+  }
+  function undo() {
+    if (S.draft && S.draft.pts.length) { S.draft.pts.pop(); if (!S.draft.pts.length) S.draft = null; draw(); return; }
+    if (S.meas.length) { S.meas.pop(); commitChange(); }
+  }
+
+  // ---------- Calibration ----------
+  let calPts = null;
+  function openCal(pts) {
+    calPts = pts;
+    const px = dist(pts[0], pts[1]);
+    $("calInfo").innerHTML = `Line drawn: <b>${fmtFtIn(toFt(px))}</b> at the current scale. Enter its real length from the plan (e.g. <b>34</b>, <b>17'</b>, <b>12' 6"</b>).`;
+    $("calInput").value = ""; $("calErr").textContent = "";
+    $("calModal").style.display = "flex"; setTimeout(() => $("calInput").focus(), 30);
+  }
+  function closeCal() { $("calModal").style.display = "none"; S.draft = null; calPts = null; draw(); }
+  function applyCal() {
+    const ft = parseLength($("calInput").value);
+    if (!ft) { $("calErr").textContent = "Enter a length like 34, 17', 12' 6\" or 296.25"; return; }
+    const px = dist(calPts[0], calPts[1]);
+    if (px < 5) { $("calErr").textContent = "That line is too short to calibrate from. Zoom in and draw a longer one."; return; }
+    S.ppf = px / ft; S.calNote = fmtFtIn(ft) + " (" + ft.toFixed(2) + " ft)";
+    $("calModal").style.display = "none"; S.draft = null; calPts = null;
+    setTool("distance"); commitChange(); toast("Scale set: " + S.ppf.toFixed(3) + " px/ft");
+  }
+
+  // ---------- Pointer input ----------
+  const pointers = new Map();
+  let gesture = null, lastClick = { t: 0, x: 0, y: 0 };
+  const rel = e => { const r = stage.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+
+  stage.addEventListener("pointerdown", e => {
+    if (e.button === 2) return;
+    stage.setPointerCapture(e.pointerId);
+    const p = rel(e); pointers.set(e.pointerId, p);
+    loupeOn = e.pointerType === "mouse";
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      gesture = { type: "pinch", d: Math.hypot(b[0] - a[0], b[1] - a[1]), c: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
+      return;
+    }
+    const hv = !S.draft ? hitVertex(p[0], p[1]) : null;
+    if (hv && e.button === 0) { gesture = { type: "vertex", hv, start: p, moved: false }; S.sel = hv.m.id; return; }
+    gesture = { type: "maybe", start: p, last: p, pan: e.button === 1 || S.tool === "pan" || e.altKey };
+  });
+  stage.addEventListener("pointermove", e => {
+    const p = rel(e); lastScreen = p; S.shift = e.shiftKey;
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, p);
+    if (gesture && gesture.type === "pinch" && pointers.size >= 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(b[0] - a[0], b[1] - a[1]), c = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      S.view.x += c[0] - gesture.c[0]; S.view.y += c[1] - gesture.c[1];
+      zoomAt(d / gesture.d, c[0], c[1]); gesture.d = d; gesture.c = c; return;
+    }
+    if (gesture && gesture.type === "vertex") {
+      const m = gesture.hv.m, i = gesture.hv.i;
+      const anchor = m.pts.length > 1 ? m.pts[i === 0 ? 1 : i - 1] : null;
+      m.pts[i] = snap(toImg(p[0], p[1]), { exclude: gesture.hv, anchor }).p;
+      gesture.moved = true; S.cursor = m.pts[i]; draw(); return;
+    }
+    if (gesture && gesture.type === "maybe") {
+      if (gesture.pan || Math.hypot(p[0] - gesture.start[0], p[1] - gesture.start[1]) > 5) {
+        gesture.type = "pan"; stage.style.cursor = "grabbing";
+      }
+    }
+    if (gesture && gesture.type === "pan") {
+      S.view.x += p[0] - gesture.last[0]; S.view.y += p[1] - gesture.last[1]; gesture.last = p; draw(); return;
+    }
+    if (gesture) gesture.last = p;
+    // hover
+    if (S.tool !== "pan" || S.draft) {
+      const anchor = S.draft && S.draft.pts.length ? S.draft.pts[S.draft.pts.length - 1] : null;
+      S.cursor = snap(toImg(p[0], p[1]), { anchor }).p;
+    } else S.cursor = null;
+    if (!S.draft && hitVertex(p[0], p[1])) stage.style.cursor = "move";
+    else stage.style.cursor = S.tool === "pan" ? "grab" : "crosshair";
+    draw();
+  });
+  function endPointer(e) {
+    const p = rel(e);
+    pointers.delete(e.pointerId);
+    if (gesture && gesture.type === "pinch") { if (pointers.size === 0) gesture = null; return; }
+    const g = gesture; gesture = null;
+    stage.style.cursor = S.tool === "pan" ? "grab" : "crosshair";
+    if (!g) return;
+    if (g.type === "vertex") {
+      if (g.moved) commitChange();
+      else if (S.tool !== "pan") { const q = g.hv.m.pts[g.hv.i]; lastClick = { t: performance.now(), x: p[0], y: p[1] }; addPoint([q[0], q[1]]); }
+      else { renderSide(); draw(); }
+      return;
+    }
+    if (g.type === "maybe" && e.type === "pointerup") {
+      const now = performance.now();
+      const dbl = now - lastClick.t < 350 && Math.hypot(p[0] - lastClick.x, p[1] - lastClick.y) < 8;
+      lastClick = { t: now, x: p[0], y: p[1] };
+      if (dbl && S.draft && (S.draft.type === "path" || S.draft.type === "area")) { finishDraft(); return; }
+      const anchor = S.draft && S.draft.pts.length ? S.draft.pts[S.draft.pts.length - 1] : null;
+      S.shift = e.shiftKey;
+      addPoint(snap(toImg(p[0], p[1]), { anchor }).p);
+    }
+  }
+  stage.addEventListener("pointerup", endPointer);
+  stage.addEventListener("pointercancel", endPointer);
+  stage.addEventListener("pointerleave", e => { if (e.pointerType === "mouse" && !gesture) { S.cursor = null; lastScreen = null; draw(); } });
+  stage.addEventListener("wheel", e => {
+    e.preventDefault();
+    const p = rel(e);
+    const k = e.ctrlKey ? 0.01 : 0.0018;
+    zoomAt(Math.exp(-e.deltaY * k), p[0], p[1]);
+  }, { passive: false });
+  stage.addEventListener("contextmenu", e => { e.preventDefault(); if (S.draft) undo(); });
+
+  window.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT") return;
+    if (e.key === "Shift") { S.shift = true; if (S.cursor && lastScreen) { const anchor = S.draft && S.draft.pts.length ? S.draft.pts[S.draft.pts.length - 1] : null; S.cursor = snap(toImg(...lastScreen), { anchor }).p; } draw(); return; }
+    const k = e.key.toLowerCase();
+    if ((e.metaKey || e.ctrlKey) && k === "z") { e.preventDefault(); undo(); return; }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (k === "d") setTool("distance"); else if (k === "p") setTool("path"); else if (k === "a") setTool("area");
+    else if (k === "c") setTool("calibrate"); else if (k === "h" || k === " ") { e.preventDefault(); setTool("pan"); }
+    else if (k === "f") fit(); else if (k === "=" || k === "+") zoomAt(1.25, W / 2, H / 2); else if (k === "-") zoomAt(0.8, W / 2, H / 2);
+    else if (k === "escape") { S.draft = null; draw(); }
+    else if (k === "enter") { e.preventDefault(); finishDraft(); }
+    else if (k === "backspace" || k === "delete") {
+      e.preventDefault();
+      if (S.draft) undo();
+      else if (S.sel) { S.meas = S.meas.filter(m => m.id !== S.sel); S.sel = null; commitChange(); }
+      else undo();
+    }
+  });
+  window.addEventListener("keyup", e => { if (e.key === "Shift") { S.shift = false; draw(); } });
+
+  // ---------- Buttons ----------
+  document.querySelectorAll("header button").forEach(b => b.addEventListener("mouseup", () => b.blur()));
+  document.querySelectorAll("#tools button").forEach(b => b.onclick = () => setTool(b.dataset.tool));
+  $("finishBtn").onclick = finishDraft;
+  $("undoBtn").onclick = undo;
+  $("fitBtn").onclick = fit;
+  $("zoomIn").onclick = () => zoomAt(1.4, W / 2, H / 2);
+  $("zoomOut").onclick = () => zoomAt(1 / 1.4, W / 2, H / 2);
+  $("calBtn").onclick = () => setTool("calibrate");
+  $("resetScale").onclick = () => { S.ppf = SHEET_PPF; S.calNote = null; commitChange(); toast("Reset to sheet scale 1\" = 20′"); };
+  $("showRefs").onchange = e => { S.showRefs = e.target.checked; draw(); save(); };
+  $("calOk").onclick = applyCal;
+  $("calCancel").onclick = closeCal;
+  $("calInput").onkeydown = e => { if (e.key === "Enter") applyCal(); if (e.key === "Escape") closeCal(); e.stopPropagation(); };
+  $("clearBtn").onclick = () => {
+    if (!S.meas.length) return;
+    if ($("clearBtn").dataset.armed) { S.meas = []; S.sel = null; delete $("clearBtn").dataset.armed; $("clearBtn").textContent = "Clear all"; commitChange(); }
+    else { $("clearBtn").dataset.armed = "1"; $("clearBtn").textContent = "Click again to clear"; setTimeout(() => { delete $("clearBtn").dataset.armed; $("clearBtn").textContent = "Clear all"; }, 2500); }
+  };
+  $("copyBtn").onclick = async () => {
+    const lines = [S.isPlan ? "6205 Rivercliffe Dr – Site Plan measurements" : "Plan measurements",
+      "Scale: " + (S.calNote ? "custom, " + S.ppf.toFixed(3) + " px/ft (from " + S.calNote + ")" : (S.isPlan ? "1\" = 20' sheet scale" : "not calibrated")), ""];
+    S.meas.forEach((m, i) => {
+      const v = measValue(m), name = m.label || (m.type[0].toUpperCase() + m.type.slice(1) + " " + (i + 1));
+      lines.push(name + ": " + v.main + (m.type === "area" ? " — " + v.sub : " (" + fmtDec(v.ft) + ")"));
+    });
+    const txt = lines.join("\n");
+    try { await navigator.clipboard.writeText(txt); toast("Copied " + S.meas.length + " measurements"); }
+    catch (err) { const f = $("fallback"); f.value = txt; f.style.display = "block"; f.select(); toast("Select the text below and copy it"); }
+  };
+  $("loadBtn").onclick = () => $("file").click();
+  $("file").onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const url = URL.createObjectURL(f), im = new Image();
+    im.onload = () => {
+      S.img = im; S.isPlan = false; S.ppf = 10; S.calNote = null; S.meas = []; S.sel = null; S.draft = null; S.showRefs = false;
+      $("refSection").style.display = "none";
+      document.querySelector("header h1").innerHTML = "Plan measuring tool <span>· " + f.name.replace(/</g, "&lt;") + "</span>";
+      fit(); setTool("calibrate"); renderSide();
+      toast("Loaded. Click both ends of a known dimension to set the scale.");
+    };
+    im.onerror = () => toast("Couldn't open that file. Use a PNG or JPG image.");
+    im.src = url;
+  };
+
+  let toastT = 0;
+  function toast(t) { const el = $("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toastT); toastT = setTimeout(() => el.style.display = "none", 2600); }
+
+  // ---------- Boot ----------
+  load();
+  window.addEventListener("resize", resize);
+  resize();
+  setTool("distance");
+  renderSide();
+  const img = new Image();
+  img.onload = () => { S.img = img; fit(); draw(); };
+  img.onerror = () => { $("hint").textContent = "The plan image didn't load. Use Load image… to open a plan image."; };
+  img.src = "plan.jpg";
+})();
+</script>
+</body>
+</html>
